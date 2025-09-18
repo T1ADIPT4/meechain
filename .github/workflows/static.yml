@@ -1,0 +1,63 @@
+name: Deploy Preview
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - workspace: meechain-dapp
+            network: mainnet
+          - workspace: hexchain-dapp
+            network: mainnet
+          - workspace: token-dashboard
+            network: mainnet
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate config
+        id: validate
+        run: |
+          node scripts/validate-config.js ${{ matrix.workspace }} ${{ matrix.network }} || echo "::set-output name=fallback::true"
+
+      - name: Set subdomain
+        run: |
+          if [[ "${{ steps.validate.outputs.fallback }}" == "true" ]]; then
+            echo "SUBDOMAIN=fallback.${{ matrix.network }}" >> $GITHUB_ENV
+          else
+            echo "SUBDOMAIN=${{ matrix.workspace }}.${{ matrix.network }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build workspace
+        run: npm run build --workspace=${{ matrix.workspace }}
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./packages/${{ matrix.workspace }}/dist
+          retention-days: 1
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+        with:
+          subdomain: ${{ env.SUBDOMAIN }}
