@@ -52,3 +52,9 @@ try {
   console.error(`❌ Invalid config for ${workspace}/${network}`)
   process.exit(1)
 }
+try {
+  QuestSchema.parse(quests)
+  console.log(`✅ Valid quest registry for ${workspace}/${network}`)
+} catch {
+  console.warn(`⚠️ No valid quests for ${workspace}/${network}`)
+}
